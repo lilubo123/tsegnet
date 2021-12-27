@@ -114,3 +114,5 @@ dmypy.json
 .pyre/
 
 /data
+
+*.h5
