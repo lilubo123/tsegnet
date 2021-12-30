@@ -2,6 +2,7 @@ import torch
 import sys
 sys.path.append("./")
 from models.pointnet2_utils import square_distance
+import models.tsg_utils as tsg_utils
 
 def distance_loss(pred_distance, sample_xyz, centroid):
     pred_distance = pred_distance.view(-1, sample_xyz.shape[2])
@@ -65,4 +66,95 @@ def centroid_loss(pred_offset, sample_xyz, distance, centroid):
     loss += (chamfer_distance_loss(pred_offset, sample_xyz, centroid) * 0.1 )
     return loss
 
-def first_seg_loss(pred_)
+def first_seg_loss(pred_mask_1, pred_weight_1, gt_bin_label):
+    # pred_mask_1: batch_size, 2, cropped
+    # pred_weight_1: batch_size, 1, cropped
+    # gt_label: batch_size, 1, cropped
+    
+    gt_bin_label = gt_bin_label.type(torch.long).view(gt_bin_label.shape[0],-1)
+
+    bce_1 = torch.nn.CrossEntropyLoss(reduction='none')(pred_mask_1, gt_bin_label)
+    pred_weight_1 = torch.sigmoid(pred_weight_1).view(pred_weight_1.shape[0],-1)
+    loss = torch.sum((bce_1 * pred_weight_1) ** 2 + (1-pred_weight_1)**2)/pred_weight_1.shape[1]
+    
+    #bce_1 = torch.nn.CrossEntropyLoss()(pred_mask_1, gt_bin_label)
+    #loss = bce_1
+    
+    return loss
+
+def first_seg_mask_loss(pred_mask_1, pred_weight_1, gt_label):
+    # pred_mask_1: batch_size, 2, cropped
+    # pred_weight_1: batch_size, 1, cropped
+    # gt_label: batch_size, 1, cropped
+
+    
+    gt_label = gt_label.view(gt_label.shape[0],-1)
+    gt_bin_label = torch.ones_like(gt_label)
+    gt_bin_label[gt_label == -1] = 0
+    gt_bin_label = gt_bin_label.type(torch.long)
+
+
+    #bce_1 = torch.nn.CrossEntropyLoss(reduction='none')(pred_mask_1, gt_bin_label)
+    #pred_weight_1 = torch.sigmoid(pred_weight_1).view(pred_weight_1.shape[0],-1)
+    #loss = torch.sum((bce_1 * pred_weight_1) ** 2 + (1-pred_weight_1)**2)/pred_weight_1.shape[1]
+    
+    bce_1 = torch.nn.CrossEntropyLoss()(pred_mask_1, gt_bin_label)
+    loss = bce_1
+    return loss
+
+
+def second_seg_loss(pred_mask_2, pred_weight_1, gt_bin_label):
+    # pred_mask_2: batch_size, 2, cropped
+    # pred_weight_1: batch_size, 1, cropped
+    # gt_label: batch_size, 1, cropped
+
+    gt_bin_label = gt_bin_label.type(torch.float32).view(gt_bin_label.shape[0],-1)
+
+    pred_mask_2 = pred_mask_2.view(pred_mask_2.shape[0], -1)
+    bce_2 = torch.nn.BCEWithLogitsLoss(reduction='none')(pred_mask_2, gt_bin_label)
+    pred_weight_1 = torch.sigmoid(pred_weight_1).view(pred_weight_1.shape[0],-1)
+    loss = torch.sum((2.0-pred_weight_1)*bce_2)/pred_weight_1.shape[1]
+
+    #bce_2 = torch.nn.BCEWithLogitsLoss()(pred_mask_2, gt_bin_label)
+    #loss = bce_2 
+    
+    return loss
+
+def second_seg_mask_loss(pred_mask_2, pred_weight_1, gt_label):
+    # pred_mask_2: batch_size, 2, cropped
+    # pred_weight_1: batch_size, 1, cropped
+    # gt_label: batch_size, 1, cropped
+    
+    gt_label = gt_label.view(gt_label.shape[0],-1)
+    gt_bin_label = torch.ones_like(gt_label)
+    gt_bin_label[gt_label == -1] = 0
+    gt_bin_label = gt_bin_label.type(torch.float32)
+
+    pred_mask_2 = pred_mask_2.view(pred_mask_2.shape[0], -1)
+    #bce_2 = torch.nn.BCEWithLogitsLoss(reduction='none')(pred_mask_2, gt_bin_label)
+    #pred_weight_1 = torch.sigmoid(pred_weight_1).view(pred_weight_1.shape[0],-1)
+    #loss = torch.sum((2.0-pred_weight_1)*bce_2)/pred_weight_1.shape[1]
+
+    bce_2 = torch.nn.BCEWithLogitsLoss()(pred_mask_2, gt_bin_label)
+    loss = bce_2 
+    return loss
+
+def id_loss(gt_label, pred_id):
+    # gt_label: batch_size, 1, 1
+    # pred_id : batch_size, 8
+    
+    gt_label = gt_label.view(-1).type(torch.long)
+    loss = torch.nn.CrossEntropyLoss()(pred_id, gt_label)
+    return loss
+
+def segmentation_loss(pd_1, weight_1, pd_2, id_pred, pred_cluster_gt_ids, pred_cluster_gt_points_bin_labels):
+    loss = id_loss(pred_cluster_gt_ids, id_pred)
+    loss += first_seg_loss(pd_1, weight_1, pred_cluster_gt_points_bin_labels)
+    loss += second_seg_loss(pd_2, weight_1, pred_cluster_gt_points_bin_labels)
+    return loss
+
+def segmentation_mask_loss(pd_1, weight_1, pd_2, id_pred, pred_cluster_gt_ids, pred_cluster_gt_points_bin_labels):
+    loss = id_loss(pred_cluster_gt_ids, id_pred)
+    loss += first_seg_mask_loss(pd_1, weight_1, pred_cluster_gt_points_bin_labels)
+    loss += second_seg_mask_loss(pd_2, weight_1, pred_cluster_gt_points_bin_labels)
+    return loss

@@ -4,7 +4,7 @@ import open3d as o3d
 import os
 import numpy as np
 from models import tsg_centroid_module, tsg_seg_module
-from models.tsg_loss import centroid_loss
+from models.tsg_loss import centroid_loss, segmentation_loss, segmentation_mask_loss
 from torch.optim.lr_scheduler import ExponentialLR
 import models.tsg_utils as utils
 
@@ -35,6 +35,8 @@ class CenterPointGenerator(Dataset):
         centroid = centroid.permute(1,0)
 
         seg_label = np.load(os.path.join("data","case1","sampled","align_low_sampled.npy"))[:,6:].astype("int")
+        # 모델이 0부터 가야지
+        seg_label -= 1
         seg_label = torch.from_numpy(seg_label)
         seg_label = seg_label.permute(1,0)
         return low_feat, centroid, seg_label
@@ -49,33 +51,43 @@ centroid_model.eval()
 seg_model = tsg_seg_module.get_model()
 seg_model.cuda()
 
-optimizer = torch.optim.Adam(centroid_model.parameters(), lr=1e-3)
+optimizer = torch.optim.Adam(seg_model.parameters(), lr=1e-3)
 scheduler = ExponentialLR(optimizer, 0.999)
 point_loader = DataLoader(CenterPointGenerator(), batch_size=1)
+for batch_item in point_loader:
+    points = batch_item[0].cuda()
+    centroids = batch_item[1].cuda()
+    seg_label = batch_item[2].cuda()
+    with torch.no_grad():
+        y_center_pred = centroid_model(points)
 for epoch in range(10000):
     for batch_item in point_loader:
         points = batch_item[0].cuda()
         centroids = batch_item[1].cuda()
-        with torch.no_grad():
-            y_center_pred = centroid_model(points)
+        seg_label = batch_item[2].cuda()
         #return x, l3_points, l0_xyz, l3_xyz, offset_result, dist_result
         #def centroid_loss(pred_offset, sample_xyz, distance, centroid):
         #loss = centroid_loss(y_center_pred[4], y_center_pred[3], y_center_pred[5], centroids)
         
         sampled_db_scan = utils.dbscan_pc(y_center_pred[3], y_center_pred[4], y_center_pred[5])
-        nearest_n = utils.get_nearest_neighbor_idx(y_center_pred[2], sampled_db_scan)
+        nearest_n = utils.get_nearest_neighbor_idx(y_center_pred[2], sampled_db_scan, 1024)
         cropped_coords, _ = utils.get_nearest_neighbor_points_with_centroids(y_center_pred[2], nearest_n, sampled_db_scan)
+        cropped_gt_labels, _ = utils.get_nearest_neighbor_points_with_centroids(seg_label, nearest_n, sampled_db_scan)
         cropped_features, sampled_centroids = utils.get_nearest_neighbor_points_with_centroids(y_center_pred[0], nearest_n, sampled_db_scan)
         seg_input = utils.concat_seg_input(cropped_features, cropped_coords, sampled_centroids)
 
-        print(seg_input.shape)
         optimizer.zero_grad()
         batch_size = 8
+        total_loss = 0
+        print(seg_input.shape[0])
         for batch_start_idx in range(0, seg_input.shape[0], batch_size):
+            print(batch_start_idx)
             pred_seg = seg_model(seg_input[batch_start_idx:batch_start_idx+batch_size, :, :])
-            temp_loss = torch.sum(pred_seg[0])
+            temp_loss = segmentation_mask_loss(pred_seg[0], pred_seg[1], pred_seg[2], pred_seg[3], cropped_gt_labels[batch_start_idx:batch_start_idx+batch_size, :, :])
             temp_loss.backward()
+            total_loss += temp_loss
+        print(total_loss)
         #loss.backward()
         optimizer.step()
         scheduler.step()
-        #torch.save(model.state_dict(), "model_2")
+        torch.save(seg_model.state_dict(), "model_seg")

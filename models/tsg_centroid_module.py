@@ -38,7 +38,6 @@ class get_model(nn.Module):
     def forward(self, xyz):
         l0_points = xyz
         l0_xyz = xyz[:,:3,:]
-
         l1_xyz, l1_points = self.sa1(l0_xyz, l0_points)
         l2_xyz, l2_points = self.sa2(l1_xyz, l1_points)
         l3_xyz, l3_points = self.sa3(l2_xyz, l2_points)
@@ -47,15 +46,15 @@ class get_model(nn.Module):
         l1_points = self.fp2(l1_xyz, l2_xyz, l1_points, l2_points)
         l0_points = self.fp1(l0_xyz, l1_xyz, l0_points, l1_points)
 
-        x = F.relu(self.bn1(self.conv1(l0_points)))
-
+        #x = F.relu(self.bn1(self.conv1(l0_points)))
+        
         offset_result = F.relu(self.offset_bn_1(self.offset_conv_1(l3_points)))
         offset_result = self.offset_conv_2(offset_result)
 
         dist_result = F.relu(self.dist_bn_1(self.dist_conv_1(l3_points)))
         dist_result = self.dist_conv_2(dist_result)
         
-        return x, l3_points, l0_xyz, l3_xyz, offset_result, dist_result
+        return l0_points, l3_points, l0_xyz, l3_xyz, offset_result, dist_result
 
 
 class get_loss(nn.Module):
