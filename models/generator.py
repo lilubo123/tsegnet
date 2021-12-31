@@ -10,15 +10,16 @@ class CenterPointGenerator(Dataset):
         self.mesh_paths = glob(os.path.join(data_dir,"*_mesh.npy"))
     
     def __len__(self):
+        #return 1
         return len(self.mesh_paths)
 
     def __getitem__(self, idx):
+        idx=0
         #low = o3d.io.read_point_cloud(os.path.join("data", "case1", "sampled", "align_low.ply"))
 
         #low_arr = np.asarray(low.points).astype("float32")
         #low_n = np.asarray(low.normals).astype("float32")
         #low_feat = np.concatenate((low_arr,low_n), axis=1)
-
         mesh_arr = np.load(self.mesh_paths[idx])
 
         low_feat = mesh_arr.copy()[:,:6].astype("float32")

@@ -40,6 +40,9 @@ class get_model(nn.Module):
         self.bn1 = nn.LayerNorm(256)#nn.BatchNorm1d(256)
         #self.drop1 = nn.Dropout(0.4)
         self.fc2 = nn.Linear(256, 8)
+        self.fc2.weight.data.fill_(0.00)
+        self.fc2.bias.data.fill_(0.00)
+
         #self.drop2 = nn.Dropout(0.5)
 
     #input으로, batch, channel(xyz + 기타등등), sample in batch 이렇게 와야 한다.

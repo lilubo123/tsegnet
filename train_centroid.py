@@ -19,7 +19,7 @@ scheduler = ExponentialLR(optimizer, 0.999)
 
 point_loader = DataLoader(CenterPointGenerator(), batch_size=1)
 val_point_loader = DataLoader(CenterPointGenerator("data/sampled_val"), batch_size=1)
-best_loss = -100
+best_loss = 100000
 for epoch in range(10000):
     centroid_model.train()
 
@@ -39,6 +39,7 @@ for epoch in range(10000):
     print("train_loss", total_loss)
     torch.save(centroid_model.state_dict(), "pretrained_cent_model_train.h5")
     #val
+"""
     centroid_model.eval()
     
     total_val_loss = 0
@@ -53,3 +54,4 @@ for epoch in range(10000):
     if total_val_loss < best_loss:
         best_loss = total_val_loss
         torch.save(centroid_model.state_dict(), "pretrained_cent_model.h5")
+"""

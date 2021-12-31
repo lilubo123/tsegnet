@@ -14,7 +14,7 @@ MEMORY_TEST = False
 
 centroid_model = tsg_centroid_module.get_model()
 centroid_model.cuda()
-centroid_model.load_state_dict(torch.load("pretrained_cent_model.h5"))
+centroid_model.load_state_dict(torch.load("pretrained_cent_model_train.h5"))
 
 SAMPLING_NUM = 2048
 
@@ -23,10 +23,10 @@ seg_model.cuda()
 
 optimizer = torch.optim.Adam(list(centroid_model.parameters()) + list(seg_model.parameters()), lr=1e-4)
 scheduler = ExponentialLR(optimizer, 0.999)
-point_loader = DataLoader(CenterPointGenerator(), batch_size=1)
+point_loader = DataLoader(CenterPointGenerator(), batch_size=2)
 val_point_loader = DataLoader(CenterPointGenerator("data/sampled_val"), batch_size=1)
 
-best_val_loss = -100
+best_val_loss = 1000000
 for epoch in range(10000):
     total_loss = 0
     centroid_model.train()
@@ -50,7 +50,6 @@ for epoch in range(10000):
         nearest_n = utils.get_nearest_neighbor_idx(center_model_output[2], sampled_db_scan, SAMPLING_NUM)
         try:
             rand_cluster_indexes = [np.random.randint(0,len(nearest_n[i])) for i in range(len(nearest_n))]
-            
             cropped_coords, _ = utils.get_nearest_neighbor_points_hold_batch(center_model_output[2], nearest_n, sampled_db_scan, rand_cluster_indexes)
             cropped_gt_labels, _ = utils.get_nearest_neighbor_points_hold_batch(seg_label, nearest_n, sampled_db_scan, rand_cluster_indexes)
             cropped_features, sampled_centroids = utils.get_nearest_neighbor_points_hold_batch(center_model_output[0], nearest_n, sampled_db_scan, rand_cluster_indexes)
@@ -65,15 +64,15 @@ for epoch in range(10000):
         pred_cluster_gt_points_bin_labels = utils.get_cluster_points_bin_label(cropped_gt_labels, pred_cluster_gt_ids)
         #gen_utils.crop_visualization(cropped_coords[:,:3], cropped_gt_labels, sampled_centroids, centroid_coords, centroid_labels)
 
-        seg_network_loss = segmentation_loss(seg_model_output[0], seg_model_output[1], seg_model_output[2], seg_model_output[3], pred_cluster_gt_ids, pred_cluster_gt_points_bin_labels)
-        
+        #seg_network_loss = segmentation_loss(seg_model_output[0], seg_model_output[1], seg_model_output[2], seg_model_output[3], pred_cluster_gt_ids, pred_cluster_gt_points_bin_labels)
+        seg_network_loss = segmentation_mask_loss(seg_model_output[0], seg_model_output[1], seg_model_output[2], seg_model_output[3], cropped_gt_labels)
 
 
         print("centroid_network_loss", centroid_network_loss)
         print("segmentation_network_loss", seg_network_loss)
 
         loss = centroid_network_loss + seg_network_loss
-        total_loss += loss
+        total_loss += loss.item()
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -82,7 +81,7 @@ for epoch in range(10000):
     torch.save(seg_model.state_dict(), "model_segmentation_recent_train")
     torch.save(centroid_model.state_dict(), "model_centroid_recent_train")
 
-
+"""
     total_val_loss = 0
     centroid_model.eval()
     seg_model.eval()
@@ -111,6 +110,7 @@ for epoch in range(10000):
             cropped_features, sampled_centroids = utils.get_nearest_neighbor_points_hold_batch(center_model_output[0], nearest_n, sampled_db_scan, rand_cluster_indexes)
             seg_input = utils.concat_seg_input(cropped_features, cropped_coords, sampled_centroids)
         except Exception as e:
+            total_val_loss += 1000
             print("in val,,")
             print(e)
             continue
@@ -133,3 +133,4 @@ for epoch in range(10000):
         best_val_loss = total_val_loss
         torch.save(seg_model.state_dict(), "model_segmentation_val_")
         torch.save(centroid_model.state_dict(), "model_centroid_val_")
+"""

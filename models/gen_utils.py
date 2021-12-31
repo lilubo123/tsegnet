@@ -53,7 +53,7 @@ def np_to_by_label(arr, axis=3):
     pcd.colors = o3d.utility.Vector3dVector(label_colors)
     return pcd
 
-def cropped_to_global_label_marker(org_points, cropped_tooth_exists, cropped_weights, cropped_tooth_num, nearest_indexes):
+def cropped_to_global_label_marker(org_points, cropped_tooth_exists, cropped_weights, cropped_tooth_num, nearest_indexes, binary_output=False):
     # org_points : 3, 16000
     # cropped_tooth_exists : num of cluster, 1 , num of points inside cluster
     # cropped_weights : num of cluster, 1 , num of points inside cluster
@@ -72,8 +72,11 @@ def cropped_to_global_label_marker(org_points, cropped_tooth_exists, cropped_wei
         cropped_tooth_weights_inside_cluster = cropped_weights[cluster_idx, :].cpu().detach().numpy()
         cropped_tooth_exists_inside_cluster = sigmoid(cropped_tooth_exists_inside_cluster)
         cropped_tooth_weights_inside_cluster = sigmoid(cropped_tooth_weights_inside_cluster)
-        cropped_indexes_have_label_arr = nearest_indexes[cluster_idx][(cropped_tooth_exists_inside_cluster * cropped_tooth_weights_inside_cluster)>=0.5]
-        labeled_points[cropped_indexes_have_label_arr, 3] = np.argmax(cropped_tooth_num[cluster_idx])+1
+        cropped_indexes_have_label_arr = nearest_indexes[cluster_idx][(cropped_tooth_exists_inside_cluster)>=0.5]
+        if binary_output:
+            labeled_points[cropped_indexes_have_label_arr, 3] = 1
+        else:
+            labeled_points[cropped_indexes_have_label_arr, 3] = np.argmax(cropped_tooth_num[cluster_idx])+1
     return labeled_points
 
 def crop_visualization(cropped_coords, cropped_gt_labels, pred_centroid_coords, gt_centorids_coords, gt_centroids_ids):
