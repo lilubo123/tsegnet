@@ -19,23 +19,23 @@ from models import gen_utils
     
 centroid_model = models.tsg_centroid_module.get_model()
 #centroid_model.load_state_dict(torch.load("pretrained_centroid_model.h5"))
-centroid_model.load_state_dict(torch.load("model_centroid_recent_train"))
+centroid_model.load_state_dict(torch.load("model_centroid_val_0101"))
 centroid_model.cuda()
 centroid_model.train()
 
-point_loader = DataLoader(CenterPointGenerator(), batch_size=1)
+point_loader = DataLoader(CenterPointGenerator("data/sampled_val/"), batch_size=1)
 
 
 
 seg_model = tsg_seg_module.get_model()
 #seg_model.load_state_dict(torch.load("model_seg"))
-seg_model.load_state_dict(torch.load("model_segmentation_recent_train"))
+seg_model.load_state_dict(torch.load("model_segmentation_val_0101"))
 seg_model.cuda()
 seg_model.train()
 
 
 #============centroid model===========#
-idx = 0
+idx = 1
 for batch_idx, item in enumerate(point_loader):
     if batch_idx!=idx:
         continue
@@ -67,8 +67,8 @@ with torch.no_grad():
 
 
 #==============cropped 마다 보이기===================#
-#if False:
-for i in range(seg_model_output[0].shape[0]):
+if False:
+#for i in range(seg_model_output[0].shape[0]):
     test_cropped = cropped_coords.cpu().detach().numpy()[i].T[:,:3]
     test_label = seg_model_output[2].cpu().detach().numpy()[i].T.reshape(-1,1)
     test_weight = seg_model_output[1].cpu().detach().numpy()[i].T.reshape(-1,1)

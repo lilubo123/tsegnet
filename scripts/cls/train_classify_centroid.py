@@ -1,23 +1,26 @@
+import sys
+import os
+sys.path.append(os.getcwd())
 import torch
 from torch.utils.data import Dataset, DataLoader
 import open3d as o3d
 import os
 import numpy as np
-from models import tsg_centroid_module, tsg_seg_module
-from models.tsg_loss import centroid_loss, segmentation_loss, segmentation_mask_loss
+from models import tsg_centroid_classify_module
+from models.tsg_centroid_classify_loss import centroid_loss
 from torch.optim.lr_scheduler import ExponentialLR
 import models.tsg_utils as utils
-from models.generator import CenterPointGenerator
+from models.generator_classify import CenterPointGenerator
 
 cuda = torch.device('cuda')
 
-centroid_model = tsg_centroid_module.get_model()
+centroid_model = tsg_centroid_classify_module.get_model()
 centroid_model.cuda()
 
 optimizer = torch.optim.Adam(centroid_model.parameters(), lr=1e-3)
 scheduler = ExponentialLR(optimizer, 0.999)
 
-point_loader = DataLoader(CenterPointGenerator(), batch_size=1)
+point_loader = DataLoader(CenterPointGenerator(), batch_size=2)
 val_point_loader = DataLoader(CenterPointGenerator("data/sampled_val"), batch_size=1)
 best_loss = 100000
 for epoch in range(10000):
@@ -26,10 +29,11 @@ for epoch in range(10000):
     total_loss = 0
     for batch_item in point_loader:
         points = batch_item[0].cuda()
-        centroids = batch_item[1].cuda()
+        gt_centroid_coords = batch_item[1].cuda()
+        gt_centroid_exists = batch_item[3].cuda()
         y_center_pred = centroid_model(points)
-
-        loss = centroid_loss(y_center_pred[4], y_center_pred[3], y_center_pred[5], centroids)
+#        return l0_points, l3_points, l0_xyz, l3_xyz, offset_result, dist_result, exist_pred
+        loss = centroid_loss(*y_center_pred, gt_centroid_coords, gt_centroid_exists)
         
         optimizer.zero_grad()
         loss.backward()
@@ -37,7 +41,8 @@ for epoch in range(10000):
         scheduler.step()
         total_loss += loss
     print("train_loss", total_loss)
-    torch.save(centroid_model.state_dict(), "pretrained_cent_model_train_1231.h5")
+    torch.save(centroid_model.state_dict(), "ckpt_cls/0102_cent_train_full_0103.h5")
+    """
     #val
     total_val_loss = 0
     for batch_item in val_point_loader:
@@ -51,3 +56,4 @@ for epoch in range(10000):
     if total_val_loss < best_loss:
         best_loss = total_val_loss
         torch.save(centroid_model.state_dict(), "pretrained_cent_model.h5")
+    """

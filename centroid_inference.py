@@ -13,7 +13,7 @@ from models.generator import CenterPointGenerator
 MEMORY_TEST = True
 
 centroid_model = tsg_centroid_module.get_model()
-centroid_model.load_state_dict(torch.load("pretrained_cent_model_train.h5"))
+centroid_model.load_state_dict(torch.load("pretrained_cent_model_val_0101.h5"))
 centroid_model.cuda()
 
 SAMPLING_NUM = 2048
@@ -40,7 +40,7 @@ for batch_item in point_loader:
     cropped_coords, _ = utils.get_nearest_neighbor_points_with_centroids(y_center_pred[2], nearest_n, sampled_db_scan)
     cropped_gt_labels, sampled_db_scan_cuda = utils.get_nearest_neighbor_points_with_centroids(seg_label, nearest_n, sampled_db_scan)
 
-    #o3d.visualization.draw_geometries([gen_utils.np_to_pcd(output_xyz_cpu, color=[0,1,0]), gen_utils.np_to_pcd(cen_cpu)], mesh_show_back_face=False,mesh_show_wireframe=True)
+    o3d.visualization.draw_geometries([gen_utils.np_to_pcd(output_xyz_cpu, color=[0,1,0]), gen_utils.np_to_pcd(cen_cpu)], mesh_show_back_face=False,mesh_show_wireframe=True)
     o3d.visualization.draw_geometries([gen_utils.np_to_pcd(output_offset_cpu+output_xyz_cpu, color=[0,1,0]), gen_utils.np_to_pcd(cen_cpu)], mesh_show_back_face=False,mesh_show_wireframe=True)
     o3d.visualization.draw_geometries([gen_utils.np_to_pcd(sampled_db_scan[0], color=[0,1,0]), gen_utils.np_to_pcd(cen_cpu)], mesh_show_back_face=False,mesh_show_wireframe=True)
     centroid_coords = centroid_coords.repeat(len(sampled_db_scan_cuda), 1, 1)

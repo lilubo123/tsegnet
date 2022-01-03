@@ -1,3 +1,6 @@
+import sys
+import os
+sys.path.append(os.getcwd())
 import open3d as o3d
 import numpy as np
 from glob import glob
@@ -7,11 +10,11 @@ from models import gen_utils
 
 
 SAMPLING_NUM = 32000
-SAVE_PATH = "sampled"
-os.makedirs(os.path.join('data', SAVE_PATH))
+SAVE_PATH = "sampled_cls_full"
+os.makedirs(os.path.join('data', SAVE_PATH), exist_ok=True)
 result_name="sugo"
 
-for case_idx in range(1,11):
+for case_idx in range(3,11):
     stl_path_list = glob(os.path.join("data",f"case{case_idx}","Crown model","*.stl"))
     full_stl_path_list = glob(os.path.join("data",f"case{case_idx}","Aligned fullArch Model and Transform value","*.stl"))
 
@@ -60,7 +63,8 @@ for case_idx in range(1,11):
 
     name_id = result_name+"_"+str(case_idx)
     ""
-    cp_arr = []
+
+    cp_dict = {}
     for stl_path in stl_path_list:
         if(gen_utils.get_number_from_name(stl_path)>=30):
             if is_up:
@@ -68,12 +72,39 @@ for case_idx in range(1,11):
         else:
             if not is_up:
                 continue
+
         mesh = o3d.io.read_triangle_mesh(stl_path)
         mesh = mesh.remove_duplicated_vertices()
         mesh_arr = np.asarray(mesh.vertices)
         mesh_arr -= sample_min
         mesh_arr /= sample_max
-        cp_arr.append(np.concatenate([np.mean(mesh_arr,axis=0),[gen_utils.get_number_from_name(stl_path)%10]]))
+        cp_dict[gen_utils.get_number_from_name(stl_path)] = np.mean(mesh_arr, axis=0)
+    cp_arr = []
+    cp_exists = []
+
+    if is_up:
+        base = 11
+    else:
+        base = 31
+
+    for class_idx in range(8):
+        tooth_num = base+class_idx
+        if tooth_num in cp_dict.keys():
+            cp_arr += [cp_dict[tooth_num]]
+            cp_exists.append(1)
+        else:
+            cp_arr += [np.array([-10,-10,-10])]
+            cp_exists.append(0)
+
+    for class_idx in range(8):
+        tooth_num = base+class_idx+10
+        if tooth_num in cp_dict.keys():
+            cp_arr += [cp_dict[tooth_num]]
+            cp_exists.append(1)
+        else:
+            cp_arr += [np.array([-10,-10,-10])]
+            cp_exists.append(0)
 
     np.save(os.path.join("data",SAVE_PATH,f"{name_id}_mesh"), sample_global_mesh_arr)
     np.save(os.path.join("data",SAVE_PATH,f"{name_id}_centroid"), np.array(cp_arr))
+    np.save(os.path.join("data",SAVE_PATH,f"{name_id}_centroid_exist"), np.array(cp_exists))

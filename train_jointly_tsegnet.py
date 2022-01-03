@@ -14,7 +14,7 @@ MEMORY_TEST = False
 
 centroid_model = tsg_centroid_module.get_model()
 centroid_model.cuda()
-centroid_model.load_state_dict(torch.load("pretrained_cent_model_train.h5"))
+centroid_model.load_state_dict(torch.load("pretrained_cent_model_val_0101.h5"))
 
 SAMPLING_NUM = 2048
 
@@ -23,7 +23,7 @@ seg_model.cuda()
 
 optimizer = torch.optim.Adam(list(centroid_model.parameters()) + list(seg_model.parameters()), lr=1e-4)
 scheduler = ExponentialLR(optimizer, 0.999)
-point_loader = DataLoader(CenterPointGenerator(), batch_size=2)
+point_loader = DataLoader(CenterPointGenerator(), batch_size=1)
 val_point_loader = DataLoader(CenterPointGenerator("data/sampled_val"), batch_size=1)
 
 best_val_loss = 1000000
@@ -78,10 +78,9 @@ for epoch in range(10000):
         optimizer.step()
         scheduler.step()
     print("train_loss", total_loss)
-    torch.save(seg_model.state_dict(), "model_segmentation_recent_train")
-    torch.save(centroid_model.state_dict(), "model_centroid_recent_train")
+    torch.save(seg_model.state_dict(), "model_segmentation_recent_train_0101")
+    torch.save(centroid_model.state_dict(), "model_centroid_recent_train_0101")
 
-"""
     total_val_loss = 0
     centroid_model.eval()
     seg_model.eval()
@@ -121,7 +120,7 @@ for epoch in range(10000):
         pred_cluster_gt_points_bin_labels = utils.get_cluster_points_bin_label(cropped_gt_labels, pred_cluster_gt_ids)
         #gen_utils.crop_visualization(cropped_coords[:,:3], cropped_gt_labels, sampled_centroids, centroid_coords, centroid_labels)
 
-        seg_network_loss = segmentation_loss(seg_model_output[0], seg_model_output[1], seg_model_output[2], seg_model_output[3], pred_cluster_gt_ids, pred_cluster_gt_points_bin_labels)
+        seg_network_loss = segmentation_mask_loss(seg_model_output[0], seg_model_output[1], seg_model_output[2], seg_model_output[3], cropped_gt_labels)
         
         print("centroid_network_loss", centroid_network_loss)
         print("segmentation_network_loss", seg_network_loss)
@@ -131,6 +130,5 @@ for epoch in range(10000):
     print("total_val_loss", total_val_loss)
     if total_val_loss < best_val_loss:
         best_val_loss = total_val_loss
-        torch.save(seg_model.state_dict(), "model_segmentation_val_")
-        torch.save(centroid_model.state_dict(), "model_centroid_val_")
-"""
+        torch.save(seg_model.state_dict(), "model_segmentation_val_0101")
+        torch.save(centroid_model.state_dict(), "model_centroid_val_0101")
